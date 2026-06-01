@@ -14,3 +14,4 @@ _deps
 .clangd
 .settings/
 build/
+sdkconfig.old
