@@ -1,4 +1,3 @@
-@@ -0,0 +1,313 @@
 /*
  * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
  *
