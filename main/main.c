@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
 
+#include "driver/rmt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
@@ -26,6 +27,7 @@
 
 
 #include "myRMT.c"
+#include "myBLE.c"
 
 
 #define EXAMPLE_IR_RESOLUTION_HZ     1000000 // 1MHz resolution, 1 tick = 1us
@@ -39,13 +41,11 @@
 // EV1527 Timing (in microseconds) - adjust these based on your receiver/remote
 #define EV1527_T_US      350 // Base timing period (example: 315us)
 #define EV1527_T_TOLERANCE_US (EV1527_T_US / 3) // Tolerance (~30%)
-//#define EV1527_SHORT_PULSE_US (EV1527_T_US) // ~210us   //TODO correct this vals
-//#define EV1527_LONG_PULSE_US  (EV1527_T_US*3) // ~420us
 
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<0) | (1ULL<<EXAMPLE_IR_RX_GPIO_NUM))
-#define tBits 24
+#define bitLen 24
 
-static const char *TAG = "renMain";
+static const char *mainTAG = "renMain";
 
 static bool example_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_data)
 {
@@ -60,7 +60,7 @@ static bool example_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "create RMT RX channel"); //create RMT RX channel
+    ESP_LOGI(mainTAG, "create RMT RX channel"); //create RMT RX channel
     rmt_rx_channel_config_t rx_channel_cfg = {
         .clk_src = RMT_CLK_SRC_DEFAULT,
         .resolution_hz = EXAMPLE_IR_RESOLUTION_HZ,
@@ -69,7 +69,7 @@ void app_main(void)
     };
     rmt_channel_handle_t rx_channel = NULL;
     ESP_ERROR_CHECK(rmt_new_rx_channel(&rx_channel_cfg, &rx_channel)); //reg new channel
-    ESP_LOGI(TAG, "register RX done callback");
+    ESP_LOGI(mainTAG, "register RX done callback");
     
     QueueHandle_t receive_queue = xQueueCreate(1, sizeof(rmt_rx_done_event_data_t));
     assert(receive_queue);
@@ -86,7 +86,7 @@ void app_main(void)
     };
 
 
-    ESP_LOGI(TAG, "create RMT TX channel");
+    ESP_LOGI(mainTAG, "create RMT TX channel");
     rmt_tx_channel_config_t tx_channel_cfg = {
         .clk_src = RMT_CLK_SRC_DEFAULT,
         .resolution_hz = EXAMPLE_IR_RESOLUTION_HZ,
@@ -110,7 +110,7 @@ void app_main(void)
     rmt_channel_handle_t tx_channel = NULL;
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_channel_cfg, &tx_channel));
 
-    ESP_LOGI(TAG, "enable RMT TX and RX channels");
+    ESP_LOGI(mainTAG, "enable RMT TX and RX channels");
     ESP_ERROR_CHECK(rmt_enable(tx_channel));
     ESP_ERROR_CHECK(rmt_enable(rx_channel));
 
@@ -132,7 +132,7 @@ void app_main(void)
             sag=decode_ev1527_signal(rx_data.received_symbols,rx_data.num_symbols);
                         int aft=uxQueueMessagesWaiting(receive_queue);
             
-            
+rx_       
             // start receive again
             int t=rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config);
 
@@ -141,18 +141,18 @@ void app_main(void)
 
 
 			
-            rmt_symbol_word_t frame[tBits + 1]; // 1 sync at the end
+            rmt_symbol_word_t frame[bitLen + 1]; // 1 sync at the end
             uint32_t code = 0x2E1412;
             
-            for (int i = 0; i < tBits; i++) {
-                bool bit = (code >> (tBits -1 - i)) & 0x1;
+            for (int i = 0; i < bitLen; i++) {
+                bool bit = (code >> (bitLen -1 - i)) & 0x1;
                 frame[i] = ev_get_symbol(bit);
             }
             // Sync pulse (gap)
-            frame[tBits].level0 = 1;
-            frame[tBits].duration0 = 350; // sync short high
-            frame[tBits].level1 = 0;
-            frame[tBits].duration1 = 10000; // long low gap
+            frame[bitLen].level0 = 1;
+            frame[bitLen].duration0 = 350; // sync short high
+            frame[bitLen].level1 = 0;
+            frame[bitLen].duration1 = 10000; // long low gap
 
             rmt_transmit_config_t tx_config = {
                 .loop_count = 10 // send whole frame 10 times
@@ -163,10 +163,8 @@ void app_main(void)
             ESP_ERROR_CHECK(
                 rmt_new_copy_encoder(&copy_encoder_cfg, &copy_encoder));
 
-
             //ESP_ERROR_CHECK(rmt_enable(tx_channel));
-            ESP_ERROR_CHECK(
-                rmt_transmit(tx_channel, copy_encoder,frame, sizeof(frame), &tx_config));
+            ESP_ERROR_CHECK(rmt_transmit(tx_channel, copy_encoder,frame, sizeof(frame), &tx_config));
                 ESP_ERROR_CHECK(rmt_tx_wait_all_done(tx_channel, 1000));
             vTaskDelay(1000/portTICK_PERIOD_MS);
         }
