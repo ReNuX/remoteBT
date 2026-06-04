@@ -11,6 +11,7 @@
 #include "hal/rmt_types.h"
 #include "stdio.h"
 
+// EV1527 Timing (in microseconds) - adjust these based on your receiver/remote
 #define EV1527_T_US      350 // Base timing period (example: 315us)
 #define EV1527_T_TOLERANCE_US (EV1527_T_US / 3) // Tolerance (~30%)
 //#define EV1527_SHORT_PULSE_US (EV1527_T_US) // ~210us   //TODO corre
@@ -107,7 +108,8 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
                 decoded_code |= level;
                 bit_count++;
             } else {
-                ESP_LOGW(TAG, "Unexpected HIGH pulse duration: %d us. Tolerances: [%d-%d], [%d-%d] bit:%d start:%d",
+				//Unexpected HIGH pulse duration: %d us. Tolerances: [%d-%d], [%d-%d] bit:%d start:%d
+                ESP_LOGW(TAG, "Unexpected H d: %d us. Tol: [%d-%d], [%d-%d] bit:%d start:%d",
                          duration_us, expected_high_min, expected_high_max, expected_low_min, expected_low_max,symbol_index,bit_count);
                 //return 0; // Unexpected duration
                 decoded_code=0;
@@ -115,9 +117,9 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
             }
             printf("%d: %"PRIx32"\n",symbol_index,decoded_code);
         if (level == 1) { // HIGH Pulse
-        ESP_LOGW(TAG, "high");
+        //ESP_LOGW(TAG, "high");
         } else { // LOW Pulse
-        ESP_LOGW(TAG, "low should never come here!!!!!!!!!!!!!!!!!!!!");
+        //ESP_LOGW(TAG, "low should never come here!!!!!!!!!!!!!!!!!!!!");
 /*        //TODO ommit this part by incloding "level" in decoded_code 1 2 lines up
              if (duration_us >= expected_low_min && duration_us <= expected_low_max) {
                 // This is a short LOW pulse (end of '0')

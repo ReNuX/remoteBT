@@ -30,19 +30,12 @@
 #include "myBLE.c"
 
 
-#define EXAMPLE_IR_RESOLUTION_HZ     1000000 // 1MHz resolution, 1 tick = 1us
-#define EXAMPLE_IR_TX_GPIO_NUM       03
-#define EXAMPLE_IR_RX_GPIO_NUM       47
-#define EXAMPLE_IR_NEC_DECODE_MARGIN 200     // Tolerance for parsing RMT symbols into bit stream
+#define RMT_433_RESOLUTION_HZ     1000000 // 1MHz resolution, 1 tick = 1us
+#define RMT_433_TX_GPIO_NUM       03
+#define RMT_433_RX_GPIO_NUM       47
 #define buf_size 160     //buffer size
 
-
-
-// EV1527 Timing (in microseconds) - adjust these based on your receiver/remote
-#define EV1527_T_US      350 // Base timing period (example: 315us)
-#define EV1527_T_TOLERANCE_US (EV1527_T_US / 3) // Tolerance (~30%)
-
-#define GPIO_INPUT_PIN_SEL  ((1ULL<<0) | (1ULL<<EXAMPLE_IR_RX_GPIO_NUM))
+#define GPIO_INPUT_PIN_SEL  ((1ULL<<0) | (1ULL<<RMT_433_RX_GPIO_NUM))
 #define bitLen 24
 
 static const char *mainTAG = "renMain";
@@ -57,15 +50,19 @@ static bool example_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt
 }
 
 
+void setup_rmt(void){
+	
+	
+}
 
 void app_main(void)
 {
     ESP_LOGI(mainTAG, "create RMT RX channel"); //create RMT RX channel
     rmt_rx_channel_config_t rx_channel_cfg = {
         .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = EXAMPLE_IR_RESOLUTION_HZ,
+        .resolution_hz = RMT_433_RESOLUTION_HZ,
         .mem_block_symbols = buf_size, // amount of RMT symbols that the channel can store at a time
-        .gpio_num = EXAMPLE_IR_RX_GPIO_NUM,
+        .gpio_num = RMT_433_RX_GPIO_NUM,
     };
     rmt_channel_handle_t rx_channel = NULL;
     ESP_ERROR_CHECK(rmt_new_rx_channel(&rx_channel_cfg, &rx_channel)); //reg new channel
@@ -78,21 +75,20 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rx_channel, &cbs, receive_queue));
 
-    // the following timing requirement is based on NEC protocol //TODO: make it rmt base
+    // should tinker with partial flags later
     rmt_receive_config_t receive_config = {
-        .signal_range_min_ns = 3100,     // the shortest duration for NEC signal is 560us, 1250ns < 560us, valid signal won't be treated as noise
-        .signal_range_max_ns = 12000000, // the longest duration for NEC signal is 9000us, 12000000ns > 9000us, the receive won't stop early
+        .signal_range_min_ns = 3100,     // this flag seems to be in ns , the duration for signal is in us,  ns < us
+        .signal_range_max_ns = 12000000, // 12000 us
         .flags.en_partial_rx=1,
     };
-
 
     ESP_LOGI(mainTAG, "create RMT TX channel");
     rmt_tx_channel_config_t tx_channel_cfg = {
         .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = EXAMPLE_IR_RESOLUTION_HZ,
+        .resolution_hz = RMT_433_RESOLUTION_HZ,
         .mem_block_symbols = 64, // amount of RMT symbols that the channel can store at a time
         .trans_queue_depth = 4,  // number of transactions that allowed to pending in the background, this example won't queue multiple transactions, so queue depth > 1 is sufficient
-        .gpio_num = EXAMPLE_IR_TX_GPIO_NUM,
+        .gpio_num = RMT_433_TX_GPIO_NUM,
         .flags.invert_out=0,
         .flags.io_loop_back=1,
     };
@@ -119,24 +115,24 @@ void app_main(void)
     rmt_rx_done_event_data_t rx_data;
     // ready to receive
     ESP_ERROR_CHECK(rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config));
-    printf("1stsymb:%d\n",raw_symbols[0].duration0);
+    //printf("1stsymb:%d\n",raw_symbols[0].duration0);
     
     while (1) {
         // wait for RX done signal
-                    int bef=uxQueueMessagesWaiting(receive_queue);
+        int bef=uxQueueMessagesWaiting(receive_queue);
         if (xQueueReceive(receive_queue, &rx_data, pdMS_TO_TICKS(20)) == pdPASS) {
             // parse the receive symbols and print the result
             //debug_routine(rx_data.received_symbols, rx_data.num_symbols);
-            uint32_t sag=3;
+            uint32_t res=3;
 
-            sag=decode_ev1527_signal(rx_data.received_symbols,rx_data.num_symbols);
+            res=decode_ev1527_signal(rx_data.received_symbols,rx_data.num_symbols);
                         int aft=uxQueueMessagesWaiting(receive_queue);
             
-rx_       
+   
             // start receive again
             int t=rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config);
 
-            printf("sag:%"PRIX32"\nbef:%d aft:%d t:%d num:%d \n",sag,bef,aft,t,rx_data.num_symbols);
+            printf("res:%"PRIX32"\nbef:%d aft:%d t:%d num:%d \n",res,bef,aft,t,rx_data.num_symbols);
         } else {
 
 
@@ -160,13 +156,12 @@ rx_
 
             rmt_encoder_handle_t copy_encoder = NULL;
             rmt_copy_encoder_config_t copy_encoder_cfg = {};
-            ESP_ERROR_CHECK(
-                rmt_new_copy_encoder(&copy_encoder_cfg, &copy_encoder));
+            //ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_cfg, &copy_encoder));
 
             //ESP_ERROR_CHECK(rmt_enable(tx_channel));
-            ESP_ERROR_CHECK(rmt_transmit(tx_channel, copy_encoder,frame, sizeof(frame), &tx_config));
-                ESP_ERROR_CHECK(rmt_tx_wait_all_done(tx_channel, 1000));
-            vTaskDelay(1000/portTICK_PERIOD_MS);
+            //ESP_ERROR_CHECK(rmt_transmit(tx_channel, copy_encoder,frame, sizeof(frame), &tx_config));
+                //ESP_ERROR_CHECK(rmt_tx_wait_all_done(tx_channel, 1000));
+            //vTaskDelay(1000/portTICK_PERIOD_MS);
         }
     }
 }
