@@ -28,7 +28,7 @@
 
 
 #include "myRMT.c"
-#include "myBLE.c"
+#include "myBLE.h"
 
 
 static const char *mainTAG = "renMain";
@@ -68,7 +68,7 @@ void app_main(void)
     
    
     setup_rmt(&rx_channel,&tx_channel);
-    
+    setup_BLE();
     ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rx_channel, &cbs, receive_queue));
     ESP_ERROR_CHECK(rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config));
      
@@ -87,11 +87,12 @@ void app_main(void)
 			}
 			if(res>0){
 				ESP_LOGI(TAG, "res:%"PRIX32"\n" ,res);
+				uint8_t *dat=(uint8_t*)&res;
+				ble_send(dat,5);
 			}
             //printf(" bef:%d aft:%d num:%d \n",bef,aft,rx_data.num_symbols);
         } else {
 
-			//TODO: move everything to this send
 			//rmt_send(0x2E1412,tx_channel);
         }
     }
