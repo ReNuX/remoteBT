@@ -7,9 +7,22 @@
 
 #include <stdint.h>
 #include <sys/_intsup.h>
+#include "driver/gpio.h"
 #include "esp_log.h"
 #include "hal/rmt_types.h"
 #include "stdio.h"
+#include "driver/rmt_tx.h"
+#include "driver/rmt_rx.h"
+#include "soc/rmt_struct.h"
+
+#define RMT_433_RESOLUTION_HZ     1000000 // 1MHz resolution, 1 tick = 1us
+#define RMT_433_TX_GPIO_NUM       03
+#define RMT_433_RX_GPIO_NUM       47
+#define buf_size 240     //buffer size DO SOMTHING TO HAVE IT ON MAIN.C FILE IN BETTER WAY
+#define bitLen 24
+
+
+#define GPIO_INPUT_PIN_SEL  ((1ULL<<0) | (1ULL<<RMT_433_RX_GPIO_NUM))
 
 // EV1527 Timing (in microseconds) - adjust these based on your receiver/remote
 #define EV1527_T_US      350 // Base timing period (example: 315us)
@@ -60,6 +73,47 @@ _Bool is_High(short num){
 }
 
 
+void setup_rmt(rmt_channel_handle_t *rx_channel,    rmt_channel_handle_t *tx_channel ){
+	ESP_LOGI(TAG, "create RMT RX channel"); //create RMT RX channel
+    rmt_rx_channel_config_t rx_channel_cfg = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = RMT_433_RESOLUTION_HZ,
+        .mem_block_symbols = 64, // amount of RMT symbols that the channel can store at a time
+        .gpio_num = RMT_433_RX_GPIO_NUM,
+    };
+    ESP_ERROR_CHECK(rmt_new_rx_channel(&rx_channel_cfg, rx_channel)); //reg new channel
+    ESP_LOGI(TAG, "register RX done callback");
+    
+    
+	ESP_LOGI(TAG, "create RMT TX channel");
+    rmt_tx_channel_config_t tx_channel_cfg = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = RMT_433_RESOLUTION_HZ,
+        .mem_block_symbols = 64, // amount of RMT symbols that the channel can store at a time
+        .trans_queue_depth = 4,  // number of transactions that allowed to pending in the background, this example won't queue multiple transactions, so queue depth > 1 is sufficient
+        .gpio_num = RMT_433_TX_GPIO_NUM,
+        .flags.invert_out=0,
+        .flags.io_loop_back=1,
+    };
+    
+    //TODO<: why its here? and check if it has any usage
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_DISABLE;	//interrupt of rising edge
+    io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;//|(1ULL <<0 ) ;    //bit mask of the pins, use GPIO4/5 here
+    io_conf.mode = GPIO_MODE_INPUT;//set as input mode
+    io_conf.pull_up_en = 0;    //enable pull-up mode
+    io_conf.pull_down_en=0;    //enable pull-up mode
+    gpio_config(&io_conf);
+    //TODO>
+    
+    ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_channel_cfg, tx_channel));
+
+    ESP_LOGI(TAG, "enable RMT TX and RX channels");
+    ESP_ERROR_CHECK(rmt_enable(*tx_channel));
+    ESP_ERROR_CHECK(rmt_enable(*rx_channel));
+
+    
+}
 
 // --- EV1527 Decoder Function ---
 // Decodes RMT symbols into an EV1527 32-bit value (24 address + 4 data)
@@ -83,6 +137,7 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
 			}else {
 				
 				
+        //ESP_LOGW(TAG, "fuck.%d",symbol_index);
 				
 				
 				symbol_index++; // Move past the sync low
@@ -109,13 +164,13 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
                 bit_count++;
             } else {
 				//Unexpected HIGH pulse duration: %d us. Tolerances: [%d-%d], [%d-%d] bit:%d start:%d
-                ESP_LOGW(TAG, "Unexpected H d: %d us. Tol: [%d-%d], [%d-%d] bit:%d start:%d",
-                         duration_us, expected_high_min, expected_high_max, expected_low_min, expected_low_max,symbol_index,bit_count);
+                //ESP_LOGW(TAG, "Unexpected H d: %d us. Tol: [%d-%d], [%d-%d] bit:%d start:%d",
+                //         duration_us, expected_high_min, expected_high_max, expected_low_min, expected_low_max,symbol_index,bit_count);
                 //return 0; // Unexpected duration
                 decoded_code=0;
                 break;
             }
-            printf("%d: %"PRIx32"\n",symbol_index,decoded_code);
+            //printf("%d: %"PRIx32"\n",symbol_index,decoded_code);
         if (level == 1) { // HIGH Pulse
         //ESP_LOGW(TAG, "high");
         } else { // LOW Pulse
@@ -133,7 +188,6 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
                 return 0; // Unexpected duration
             }*/
         }
-
         symbol_index++; // Move to the next symbol
     }
 				
@@ -145,7 +199,7 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
         // We expect the next symbol to be a long low pause.
         // This is a simplified check; a more robust one would measure the gap duration.
         // For now, we assume 28 bits means a valid frame if we reached here.
-        ESP_LOGI(TAG, "sexyyyy");
+        //ESP_LOGI(TAG, "sexyyyy");
         return decoded_code;
     } 
 			//break;
@@ -153,7 +207,7 @@ static uint32_t decode_ev1527_signal(rmt_symbol_word_t *symbols, uint8_t num_sym
 		
 	} 
     if (symbol_index >= num_symbols) {
-        ESP_LOGW(TAG, "Could not find sync pulse or signal too short.%d",symbol_index);
+        //ESP_LOGW(TAG, "Could not find sync pulse or signal too short.%d",symbol_index);
         return 0; // Sync pulse not found or too short
     }
 
@@ -187,4 +241,32 @@ static void debug_routine(rmt_symbol_word_t *rmt_nec_symbols, size_t symbol_num)
                rmt_nec_symbols[i].level1, rmt_nec_symbols[i].duration1);
     }
     printf("---frame end: \n");
+}
+
+
+void rmt_send(uint32_t code, rmt_channel_handle_t tx_channel){
+	rmt_symbol_word_t frame[bitLen + 1]; // 1 sync at the end
+            
+            for (int i = 0; i < bitLen; i++) {
+                bool bit = (code >> (bitLen -1 - i)) & 0x1;
+                frame[i] = ev_get_symbol(bit);
+            }
+            // Sync pulse (gap)
+            frame[bitLen].level0 = 1;
+            frame[bitLen].duration0 = 350; // sync short high
+            frame[bitLen].level1 = 0;
+            frame[bitLen].duration1 = 10000; // long low gap
+
+            rmt_transmit_config_t tx_config = {
+                .loop_count = 10 // send whole frame 10 times
+            };
+
+            rmt_encoder_handle_t copy_encoder = NULL;
+            rmt_copy_encoder_config_t copy_encoder_cfg = {};
+            
+			ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_cfg, &copy_encoder));
+            //ESP_ERROR_CHECK(rmt_enable(tx_channel));
+            ESP_ERROR_CHECK(rmt_transmit(tx_channel, copy_encoder,frame, sizeof(frame), &tx_config));
+            ESP_ERROR_CHECK(rmt_tx_wait_all_done(tx_channel, 1000));
+	
 }
