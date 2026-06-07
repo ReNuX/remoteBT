@@ -1,6 +1,7 @@
 /*
 my BLE scope of project based on gatts example
  */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,3 +26,8 @@ enum
 
 void setup_BLE(void);
 void ble_send(uint8_t *data,uint8_t len);
+
+//callback system:
+typedef void (*my_callback_t)(uint8_t *resualt,void *userdata) ;
+void reg_ble_callback(my_callback_t,void *userdata); //fun to reg call
+void ble_receive(uint8_t *data) ; //BLE fun to call the callback reged fun

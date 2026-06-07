@@ -32,6 +32,8 @@
 
 
 static const char *mainTAG = "renMain";
+    rmt_channel_handle_t rx_channel = NULL;
+    rmt_channel_handle_t tx_channel = NULL; 
 
 static bool my_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_data)
 {
@@ -43,11 +45,17 @@ static bool my_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt_rx_d
     return high_task_wakeup == pdTRUE;
 }
 
+void ble_callback_handler(uint8_t *data,void *userdata){
+	int *my_val=(int *)userdata;
+	uint32_t tmp=*(uint32_t*)data;
+	ESP_LOGI(mainTAG,"called back @main data:%"PRIX32" userdata%d",tmp,*my_val);
+	rmt_send(tmp,tx_channel);
+	
+}
 
 void app_main(void)
 {
-    rmt_channel_handle_t rx_channel = NULL;
-    rmt_channel_handle_t tx_channel = NULL;   
+  
 
     // should tinker with partial flags later
     rmt_receive_config_t receive_config = {
@@ -69,6 +77,8 @@ void app_main(void)
    
     setup_rmt(&rx_channel,&tx_channel);
     setup_BLE();
+    int t=100;
+    reg_ble_callback(ble_callback_handler,&t);
     ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rx_channel, &cbs, receive_queue));
     ESP_ERROR_CHECK(rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config));
      

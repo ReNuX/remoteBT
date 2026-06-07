@@ -36,10 +36,15 @@
 #define ADV_CONFIG_FLAG             (1 << 0)
 #define SCAN_RSP_CONFIG_FLAG        (1 << 1)
 
-
+//for send renux
 static uint16_t conn_handle=0;
 static uint16_t attr_handle=0;
 static esp_gatt_if_t mygatts_if=ESP_GATT_IF_NONE;
+//for rec renux
+static my_callback_t s_callback=NULL;
+static void *s_userdata=NULL;
+
+//end renux
 
 static uint8_t adv_config_done       = 0;
 
@@ -383,6 +388,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,esp_gatt_if_t
                 // the data length of gattc write  must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX.
                 ESP_LOGI(GATTS_TABLE_TAG, "GATT_WRITE_EVT, handle = %d, value len = %d, value :", param->write.handle, param->write.len);
                 esp_log_buffer_hex(GATTS_TABLE_TAG, param->write.value, param->write.len);
+                ble_receive(param->write.value);
                 if (heart_rate_handle_table[IDX_CHAR_CFG_A] == param->write.handle && param->write.len == 2){
                     uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
                     if (descr_value == 0x0001){
@@ -596,9 +602,18 @@ void ble_send(uint8_t *data,uint8_t len)
 	if (conn_handle!=0){
 		esp_ble_gatts_send_indicate(mygatts_if, conn_handle, attr_handle, len, data, false);
 	}else {
- ESP_LOGE(GATTS_TABLE_TAG, "not connected hand:%d ,attr: %d len:%d",conn_handle,attr_handle,len);
- esp_ble_gatts_send_indicate(mygatts_if, conn_handle, heart_rate_handle_table[IDX_CHAR_VAL_A], len, data, false);
-	
-    
+ 		ESP_LOGE(GATTS_TABLE_TAG, "not connected hand:%d ,attr: %d len:%d",conn_handle,attr_handle,len);
+ 		esp_ble_gatts_send_indicate(mygatts_if, conn_handle, heart_rate_handle_table[IDX_CHAR_VAL_A], len, data, false);
+ 	}
 }
+
+void reg_ble_callback(my_callback_t callback, void *userdata){
+	s_callback=callback;
+	s_userdata=userdata;
+}
+
+void ble_receive(uint8_t *data){
+	if (s_callback!=NULL){
+		s_callback(data,s_userdata);
+	}
 }
