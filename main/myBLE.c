@@ -67,7 +67,7 @@ static uint8_t raw_adv_data[] = {
         /* service uuid */
         0x03, 0x03, 0xFB, 0x00,
         /* device name */
-        0x0f, 0x09, 'E', 'S', 'P', '_', 'G', 'A', 'T', 'T', 'S', '_', 'D','E', 'K', 'O'
+        0x0f, 0x09, 'E', 'S', 'P', '_', 'R', 'e', 'N', 'u', 'X', '_', 'B','L', 'E', '*'
 };
 static uint8_t raw_scan_rsp_data[] = {
         /* flags */
@@ -393,6 +393,8 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,esp_gatt_if_t
                     uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
                     if (descr_value == 0x0001){
                         ESP_LOGI(GATTS_TABLE_TAG, "notify enable");
+                        //TODO: read later to check its purpose
+                        /*
                         uint8_t notify_data[15];
                         for (int i = 0; i < sizeof(notify_data); ++i)
                         {
@@ -400,10 +402,11 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,esp_gatt_if_t
                         }
                         //the size of notify_data[] need less than MTU size
                         esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, heart_rate_handle_table[IDX_CHAR_VAL_A],
-                                                sizeof(notify_data), notify_data, false);
+                                                sizeof(notify_data), notify_data, false);*/
                     }else if (descr_value == 0x0002){
                         ESP_LOGI(GATTS_TABLE_TAG, "indicate enable");
-                        uint8_t indicate_data[15];
+                        //TODO: also this one; seems its just a demo for notif and indicate
+                        /*uint8_t indicate_data[15];
                         for (int i = 0; i < sizeof(indicate_data); ++i)
                         {
                             indicate_data[i] = i % 0xff;
@@ -415,7 +418,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,esp_gatt_if_t
 
                         //the size of indicate_data[] need less than MTU size
                         esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, heart_rate_handle_table[IDX_CHAR_VAL_A],
-                                            sizeof(indicate_data), indicate_data, true);
+                                            sizeof(indicate_data), indicate_data, true);*/
                     }
                     else if (descr_value == 0x0000){
                         ESP_LOGI(GATTS_TABLE_TAG, "notify/indicate disable ");

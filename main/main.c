@@ -92,13 +92,29 @@ void app_main(void)
             uint32_t res=decode_ev1527_signal(rx_data.received_symbols,rx_data.num_symbols);
             //int aft=uxQueueMessagesWaiting(receive_queue);
 
-            if(rx_data.flags.is_last){
-				(void) rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config);
-			}
+
 			if(res>0){
 				ESP_LOGI(TAG, "res:%"PRIX32"\n" ,res);
 				uint8_t *dat=(uint8_t*)&res;
+				//if(dat[0]=='9')
+				//{ESP_LOGI(TAG, "huhu");}
+				//ESP_LOGI(TAG, "hehe %d,%d,%c,%hhu",dat[0],dat[1],(char) dat[0],dat[1]);
+				
+				/*for (int ee=0; ee<10; ee++) {
+					ESP_LOGI(TAG, "%d.%d=%c,",ee,dat[ee],(char) dat[ee]);
+					BYTE tmp=(res >> (bitLen -1 - (ee*3))) & 0xf;
+					BYTE tmp2=(res >> (bitLen -1 - ee)) & 0x1;
+					ESP_LOGI(TAG, "->%d=%d,",tmp, tmp2);
+				
+					}*/
+
+				//debug_routine(rx_data.received_symbols, rx_data.num_symbols);
+            
 				ble_send(dat,5);
+			}
+			
+			if(rx_data.flags.is_last){
+				(void) rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config);
 			}
             //printf(" bef:%d aft:%d num:%d \n",bef,aft,rx_data.num_symbols);
         } else {
