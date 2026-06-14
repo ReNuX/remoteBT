@@ -28,10 +28,12 @@
 
 
 #include "myRMT.c"
-#include "myBLE.c"
+#include "myBLE.h"
 
 
 static const char *mainTAG = "renMain";
+    rmt_channel_handle_t rx_channel = NULL;
+    rmt_channel_handle_t tx_channel = NULL; 
 
 static bool my_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *edata, void *user_data)
 {
@@ -43,11 +45,17 @@ static bool my_rmt_rx_done_callback(rmt_channel_handle_t channel, const rmt_rx_d
     return high_task_wakeup == pdTRUE;
 }
 
+void ble_callback_handler(uint8_t *data,void *userdata){
+	int *my_val=(int *)userdata;
+	uint32_t tmp=*(uint32_t*)data;
+	ESP_LOGI(mainTAG,"called back @main data:%"PRIX32" userdata%d",tmp,*my_val);
+	rmt_send(tmp,tx_channel);
+	
+}
 
 void app_main(void)
 {
-    rmt_channel_handle_t rx_channel = NULL;
-    rmt_channel_handle_t tx_channel = NULL;   
+  
 
     // should tinker with partial flags later
     rmt_receive_config_t receive_config = {
@@ -68,7 +76,9 @@ void app_main(void)
     
    
     setup_rmt(&rx_channel,&tx_channel);
-    
+    setup_BLE();
+    int t=100;
+    reg_ble_callback(ble_callback_handler,&t);
     ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rx_channel, &cbs, receive_queue));
     ESP_ERROR_CHECK(rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config));
      
@@ -82,16 +92,33 @@ void app_main(void)
             uint32_t res=decode_ev1527_signal(rx_data.received_symbols,rx_data.num_symbols);
             //int aft=uxQueueMessagesWaiting(receive_queue);
 
-            if(rx_data.flags.is_last){
-				(void) rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config);
-			}
+
 			if(res>0){
 				ESP_LOGI(TAG, "res:%"PRIX32"\n" ,res);
+				uint8_t *dat=(uint8_t*)&res;
+				//if(dat[0]=='9')
+				//{ESP_LOGI(TAG, "huhu");}
+				//ESP_LOGI(TAG, "hehe %d,%d,%c,%hhu",dat[0],dat[1],(char) dat[0],dat[1]);
+				
+				/*for (int ee=0; ee<10; ee++) {
+					ESP_LOGI(TAG, "%d.%d=%c,",ee,dat[ee],(char) dat[ee]);
+					BYTE tmp=(res >> (bitLen -1 - (ee*3))) & 0xf;
+					BYTE tmp2=(res >> (bitLen -1 - ee)) & 0x1;
+					ESP_LOGI(TAG, "->%d=%d,",tmp, tmp2);
+				
+					}*/
+
+				//debug_routine(rx_data.received_symbols, rx_data.num_symbols);
+            
+				ble_send(dat,5);
+			}
+			
+			if(rx_data.flags.is_last){
+				(void) rmt_receive(rx_channel, raw_symbols, sizeof(raw_symbols), &receive_config);
 			}
             //printf(" bef:%d aft:%d num:%d \n",bef,aft,rx_data.num_symbols);
         } else {
 
-			//TODO: move everything to this send
 			//rmt_send(0x2E1412,tx_channel);
         }
     }

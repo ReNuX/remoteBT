@@ -93,10 +93,10 @@ void setup_rmt(rmt_channel_handle_t *rx_channel,    rmt_channel_handle_t *tx_cha
         .trans_queue_depth = 4,  // number of transactions that allowed to pending in the background, this example won't queue multiple transactions, so queue depth > 1 is sufficient
         .gpio_num = RMT_433_TX_GPIO_NUM,
         .flags.invert_out=0,
-        .flags.io_loop_back=1,
+        .flags.io_loop_back=0,
     };
     
-    //TODO<: why its here? and check if it has any usage
+/*    //TODO<: why its here? and check if it has any usage
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_DISABLE;	//interrupt of rising edge
     io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;//|(1ULL <<0 ) ;    //bit mask of the pins, use GPIO4/5 here
@@ -104,7 +104,7 @@ void setup_rmt(rmt_channel_handle_t *rx_channel,    rmt_channel_handle_t *tx_cha
     io_conf.pull_up_en = 0;    //enable pull-up mode
     io_conf.pull_down_en=0;    //enable pull-up mode
     gpio_config(&io_conf);
-    //TODO>
+    //TODO>*/
     
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_channel_cfg, tx_channel));
 
@@ -255,7 +255,7 @@ void rmt_send(uint32_t code, rmt_channel_handle_t tx_channel){
             frame[bitLen].level0 = 1;
             frame[bitLen].duration0 = 350; // sync short high
             frame[bitLen].level1 = 0;
-            frame[bitLen].duration1 = 10000; // long low gap
+            frame[bitLen].duration1 = 11000; // long low gap
 
             rmt_transmit_config_t tx_config = {
                 .loop_count = 10 // send whole frame 10 times
